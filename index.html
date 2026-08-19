@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Controle de Ponto e Gestão de Horas</title>
+  <meta name="description" content="Sistema completo de gestão de ponto, banco de horas, folha de ponto e admissão de funcionários.">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- html2pdf para exportação PDF autônoma e offline -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+
+  <!-- HEADER PRINCIPAL -->
+  <header class="app-header">
+    <div class="header-top">
+      <div class="brand-section">
+        <div class="brand-icon">⏱️</div>
+        <div>
+          <h1 class="brand-title">PontoGestão Pro</h1>
+          <p class="brand-subtitle">Controle de Horas, Ponto & Admissão</p>
+        </div>
+      </div>
+
+      <div class="company-badge-header">
+        <span class="empresa-name" id="hdr-empresa-name">VIA TAQUALITO COMÉRCIO DE ALIMENTOS LTDA</span>
+        <span class="cycle-info" id="hdr-cycle-info">Ciclo: 21/06/2026 a 21/07/2026</span>
+        <button class="btn btn-secondary btn-sm" id="btn-edit-company" title="Editar dados da Empresa">⚙️ Configurações</button>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-export-backup" title="Exportar Backup dos Dados">💾 Backup</button>
+        <button class="btn btn-secondary btn-sm" id="btn-import-backup" title="Restaurar Backup">📂 Restaurar</button>
+        <input type="file" id="file-import-backup" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <!-- BARRA DE NAVEGAÇÃO ENTRE MÓDULOS -->
+    <nav class="app-nav">
+      <button class="nav-tab active" data-target="view-home" id="tab-nav-home">
+        <span>🏠</span> Início / Funcionários
+      </button>
+      <button class="nav-tab" data-target="view-cartao" id="tab-nav-cartao">
+        <span>📅</span> Cartão de Ponto Individual
+      </button>
+      <button class="nav-tab" data-target="view-resumo" id="tab-nav-resumo">
+        <span>📊</span> Resumo de Horas
+      </button>
+      <button class="nav-tab" data-target="view-admissao" id="tab-nav-admissao">
+        <span>📝</span> Ficha de Admissão
+      </button>
+      <button class="nav-tab" data-target="view-folha" id="tab-nav-folha">
+        <span>📄</span> Folha de Ponto / Impressão
+      </button>
+    </nav>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL -->
+  <main class="app-main" id="app-main-content">
+
+    <!-- ====================================================================
+         VIEW 1: INÍCIO (HOME) & FUNCIONÁRIOS
+         ==================================================================== -->
+    <section class="view-section active" id="view-home">
+      <div class="home-grid">
+        <!-- Card Lateral: Dados da Empresa & Ciclo -->
+        <div class="card company-settings-card">
+          <div class="card-header">
+            <h2 class="card-title">🏢 Dados da Empresa</h2>
+          </div>
+          <form id="form-company-quick-edit">
+            <div class="form-group">
+              <label class="form-label" for="inp-home-empresa">Razão Social</label>
+              <input type="text" id="inp-home-empresa" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inp-home-cnpj">CNPJ</label>
+              <input type="text" id="inp-home-cnpj" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inp-home-endereco">Endereço</label>
+              <input type="text" id="inp-home-endereco" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="inp-home-iniciociclo">Início do Ciclo (31 dias)</label>
+              <input type="date" id="inp-home-iniciociclo" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Salvar Configurações</button>
+          </form>
+
+          <div class="quick-actions-box">
+            <h3 class="form-label" style="margin-top: 12px;">Ações Rápidas do Sistema</h3>
+            <button class="btn btn-secondary" id="btn-quick-folha-ponto">📄 Emitir Folha de Ponto (Lote)</button>
+            <button class="btn btn-secondary" id="btn-quick-resumo">📊 Ver Resumo de Horas</button>
+            <button class="btn btn-secondary" id="btn-quick-admissao">📝 Nova Ficha de Admissão</button>
+          </div>
+        </div>
+
+        <!-- Lista / Grade de Funcionários (Equivalente aos 22 slots f1..f22) -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">👥 Quadro de Colaboradores (<span id="count-employees">19</span>/22)</h2>
+            <button class="btn btn-primary btn-sm" id="btn-open-new-emp-modal">➕ Cadastrar Colaborador</button>
+          </div>
+
+          <div class="employees-grid-container" id="employees-grid">
+            <!-- Renderizado dinamicamente via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 2: CARTÃO DE PONTO INDIVIDUAL (f1..f22)
+         ==================================================================== -->
+    <section class="view-section" id="view-cartao">
+      <div class="timecard-header-bar no-print">
+        <div class="employee-select-group">
+          <label class="form-label" for="select-active-employee" style="margin:0;">Colaborador:</label>
+          <select id="select-active-employee" class="form-control" style="width: auto;">
+            <!-- Preenchido via JS com f1..f22 -->
+          </select>
+        </div>
+
+        <div class="timecard-summary-pills" id="timecard-stats-bar">
+          <div class="stat-pill">
+            <span class="label">Escala / Carga</span>
+            <span class="value" id="stat-carga-horaria">07:20</span>
+          </div>
+          <div class="stat-pill">
+            <span class="label">Total Trabalhado</span>
+            <span class="value" id="stat-total-trabalhado">00:00</span>
+          </div>
+          <div class="stat-pill">
+            <span class="label">Hs. 50%</span>
+            <span class="value" id="stat-hs50" style="color:var(--color-success);">00:00</span>
+          </div>
+          <div class="stat-pill">
+            <span class="label">Hs. 100%</span>
+            <span class="value" id="stat-hs100" style="color:var(--color-warning);">00:00</span>
+          </div>
+          <div class="stat-pill">
+            <span class="label">Ad. Noturno</span>
+            <span class="value" id="stat-adnot" style="color:#7c3aed;">00:00</span>
+          </div>
+          <div class="stat-pill">
+            <span class="label">Faltas / Atrasos</span>
+            <span class="value" id="stat-faltas" style="color:var(--color-danger);">00:00</span>
+          </div>
+        </div>
+
+        <div class="timecard-nav-controls">
+          <button class="btn btn-secondary btn-sm" id="btn-tc-prev">◀ Anterior</button>
+          <button class="btn btn-secondary btn-sm" id="btn-tc-next">Próximo ▶</button>
+          <button class="btn btn-danger btn-sm" id="btn-tc-clear-hours" title="Executar macro limparHoras">🗑️ Limpar Horas</button>
+          <button class="btn btn-secondary btn-sm" id="btn-tc-print">🖨️ Imprimir</button>
+          <button class="btn btn-primary btn-sm" id="btn-tc-pdf">📥 PDF</button>
+        </div>
+      </div>
+
+      <!-- Tabela dos 31 dias com inputs e cálculos em tempo real -->
+      <div class="timecard-table-wrapper" id="timecard-printable-area">
+        <table class="timecard-table" id="table-timecard">
+          <thead>
+            <tr>
+              <th style="width: 100px;">Data</th>
+              <th style="width: 110px;">Evento</th>
+              <th>Entrada</th>
+              <th>Int. Saída</th>
+              <th>Int. Retorno</th>
+              <th>Saída</th>
+              <th>Total</th>
+              <th>Difer.</th>
+              <th>Ad. Not</th>
+              <th>Feriado</th>
+              <th>Hs. 50%</th>
+              <th>Hs. 100%</th>
+              <th>Dom</th>
+              <th>Faltas</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-timecard-days">
+            <!-- 31 linhas renderizadas dinamicamente -->
+          </tbody>
+          <tfoot>
+            <tr id="tfoot-timecard-totals">
+              <td colspan="6" style="text-align: right; padding-right: 14px;">TOTAIS ACUMULADOS NO CICLO:</td>
+              <td id="tot-col-total">00:00</td>
+              <td>-</td>
+              <td id="tot-col-adnot">00:00</td>
+              <td id="tot-col-feriado">00:00</td>
+              <td id="tot-col-hs50">00:00</td>
+              <td id="tot-col-hs100">00:00</td>
+              <td id="tot-col-dom">00:00</td>
+              <td id="tot-col-faltas">00:00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 3: RESUMO DE HORAS (resumoHoras)
+         ==================================================================== -->
+    <section class="view-section" id="view-resumo">
+      <div class="resumo-toolbar no-print">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--color-primary);">Quadro Geral - Resumo de Horas</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Consolidado de horas extras, adicionais noturnos e faltas de todos os colaboradores</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" id="btn-resumo-print">🖨️ Imprimir Resumo</button>
+          <button class="btn btn-primary" id="btn-resumo-pdf">📥 Exportar PDF</button>
+        </div>
+      </div>
+
+      <div class="resumo-header-info" id="resumo-header-block">
+        <div>
+          <span class="form-label">Empresa</span>
+          <strong id="resumo-empresa-lbl">-</strong>
+        </div>
+        <div>
+          <span class="form-label">CNPJ</span>
+          <strong id="resumo-cnpj-lbl">-</strong>
+        </div>
+        <div>
+          <span class="form-label">Período de Apuração</span>
+          <strong id="resumo-periodo-lbl">-</strong>
+        </div>
+      </div>
+
+      <div class="resumo-table-container" id="resumo-printable-area">
+        <table class="resumo-table" id="table-resumo-horas">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ID</th>
+              <th>Funcionário</th>
+              <th class="num-col">Ad. Not</th>
+              <th class="num-col">Feriado</th>
+              <th class="num-col">Hs. 50%</th>
+              <th class="num-col">Hs. 100%</th>
+              <th class="num-col">Dom</th>
+              <th class="num-col">Faltas</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-resumo-horas">
+            <!-- 22 linhas preenchidas via JS -->
+          </tbody>
+          <tfoot>
+            <tr id="tfoot-resumo-horas">
+              <td colspan="2">TOTAIS GERAIS:</td>
+              <td class="num-col" id="sum-adnot">00:00</td>
+              <td class="num-col" id="sum-feriado">00:00</td>
+              <td class="num-col" id="sum-hs50">00:00</td>
+              <td class="num-col" id="sum-hs100">00:00</td>
+              <td class="num-col" id="sum-dom">00:00</td>
+              <td class="num-col" id="sum-faltas">00:00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 4: FICHA DE ADMISSÃO (admissao)
+         ==================================================================== -->
+    <section class="view-section" id="view-admissao">
+      <div class="admission-form-wrapper" id="admission-printable-area">
+        <div class="card-header" style="border-bottom: 2px solid var(--color-primary); margin-bottom: 20px;">
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--color-primary);">FICHA PARA ADMISSÃO DE FUNCIONÁRIO</h2>
+            <p style="font-size: 0.85rem; color: var(--text-muted);" id="adm-empresa-subhead">VIA TAQUALITO COMÉRCIO DE ALIMENTOS LTDA | CNPJ: 64.864.904/0001-48</p>
+          </div>
+          <div class="no-print" style="display:flex; gap: 8px;">
+            <button class="btn btn-danger btn-sm" id="btn-adm-clear">🗑️ Limpar Formulário</button>
+            <button class="btn btn-secondary btn-sm" id="btn-adm-print">🖨️ Imprimir</button>
+            <button class="btn btn-primary btn-sm" id="btn-adm-pdf">📥 PDF</button>
+          </div>
+        </div>
+
+        <form id="form-admission">
+          <!-- 1. Dados do Cargo e Jornada -->
+          <div class="admission-section">
+            <h3 class="section-title">💼 1. Cargo & Horário de Trabalho</h3>
+            <div class="form-row cols-3">
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label" for="adm-nome">Nome Completo do Funcionário *</label>
+                <input type="text" id="adm-nome" class="form-control" required placeholder="Nome completo">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-funcao">Função *</label>
+                <select id="adm-funcao" class="form-control" required>
+                  <!-- Funções preenchidas dinamicamente -->
+                </select>
+              </div>
+            </div>
+
+            <div class="form-row cols-4">
+              <div class="form-group">
+                <label class="form-label" for="adm-data-admissao">Data de Admissão</label>
+                <input type="date" id="adm-data-admissao" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-jornada">Jornada Diária</label>
+                <input type="text" id="adm-jornada" class="form-control" placeholder="07:20">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-escala">Escala *</label>
+                <select id="adm-escala" class="form-control">
+                  <option value="6x1">6x1</option>
+                  <option value="12x36">12x36</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-salario">Salário (R$)</label>
+                <input type="text" id="adm-salario" class="form-control" placeholder="R$ 0,00">
+              </div>
+            </div>
+
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label" for="adm-hora-entrada">Hora de Entrada</label>
+                <input type="time" id="adm-hora-entrada" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-intervalo">Intervalo</label>
+                <input type="text" id="adm-intervalo" class="form-control" placeholder="12:00 às 13:00">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-hora-saida">Hora de Saída</label>
+                <input type="time" id="adm-hora-saida" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Vale Transporte -->
+          <div class="admission-section">
+            <h3 class="section-title">🚌 2. Transporte</h3>
+            <div class="form-row cols-4">
+              <div class="form-group">
+                <label class="form-label" for="adm-vt-ida-qtd">Residência/Trabalho - Qtd</label>
+                <input type="number" id="adm-vt-ida-qtd" class="form-control" value="1" min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-vt-ida-val">Valor Passagem (Ida)</label>
+                <input type="text" id="adm-vt-ida-val" class="form-control" value="R$ 4,30">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-vt-volta-qtd">Trabalho/Residência - Qtd</label>
+                <input type="number" id="adm-vt-volta-qtd" class="form-control" value="1" min="0">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-vt-volta-val">Valor Passagem (Volta)</label>
+                <input type="text" id="adm-vt-volta-val" class="form-control" value="R$ 4,30">
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Dados Familiares -->
+          <div class="admission-section">
+            <h3 class="section-title">👨‍👩‍👦 3. Filiação, Estado Civil & Dependentes</h3>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label" for="adm-nome-pai">Nome do Pai</label>
+                <input type="text" id="adm-nome-pai" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-nome-mae">Nome da Mãe</label>
+                <input type="text" id="adm-nome-mae" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label">Estado Civil</label>
+                <div class="radio-checkbox-group">
+                  <label><input type="radio" name="adm-estado-civil" value="Solteiro(a)" checked> Solteiro(a)</label>
+                  <label><input type="radio" name="adm-estado-civil" value="Casado(a)"> Casado(a)</label>
+                  <label><input type="radio" name="adm-estado-civil" value="Outro"> Outro</label>
+                </div>
+              </div>
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label" for="adm-nome-conjuge">Nome do Cônjuge</label>
+                <input type="text" id="adm-nome-conjuge" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label">Filhos menores de 14 anos?</label>
+                <div class="radio-checkbox-group">
+                  <label><input type="radio" name="adm-filhos" value="Nao" checked> Não</label>
+                  <label><input type="radio" name="adm-filhos" value="Sim"> Sim</label>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-filhos-qtd">Quantos Filhos?</label>
+                <input type="number" id="adm-filhos-qtd" class="form-control" min="0" placeholder="0">
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Documentos Obrigatórios -->
+          <div class="admission-section">
+            <h3 class="section-title">📄 4. Documentos Obrigatórios</h3>
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label" for="adm-ctps-num">CTPS nº</label>
+                <input type="text" id="adm-ctps-num" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-ctps-serie">Série</label>
+                <input type="text" id="adm-ctps-serie" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-ctps-uf">UF</label>
+                <input type="text" id="adm-ctps-uf" class="form-control" maxlength="2" placeholder="RJ">
+              </div>
+            </div>
+
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label" for="adm-rg-num">RG nº</label>
+                <input type="text" id="adm-rg-num" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-rg-emissor">Órgão Emissor</label>
+                <input type="text" id="adm-rg-emissor" class="form-control" placeholder="DETRAN">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-rg-uf">UF</label>
+                <input type="text" id="adm-rg-uf" class="form-control" maxlength="2" placeholder="RJ">
+              </div>
+            </div>
+
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label" for="adm-cpf">CPF nº *</label>
+                <input type="text" id="adm-cpf" class="form-control" placeholder="000.000.000-00">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-pis">PIS/PASEP</label>
+                <input type="text" id="adm-pis" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label" for="adm-reservista">Certificado de Reservista nº</label>
+                <input type="text" id="adm-reservista" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-reservista-cat">Categoria</label>
+                <input type="text" id="adm-reservista-cat" class="form-control">
+              </div>
+            </div>
+
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label" for="adm-titulo">Título de Eleitor</label>
+                <input type="text" id="adm-titulo" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-instrucao">Grau de Instrução *</label>
+                <select id="adm-instrucao" class="form-control" required>
+                  <!-- Graus de instrução via JS -->
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Endereço e Contato -->
+          <div class="admission-section">
+            <h3 class="section-title">📍 5. Endereço & Contatos</h3>
+            <div class="form-row cols-3">
+              <div class="form-group" style="grid-column: span 2;">
+                <label class="form-label" for="adm-endereco">Endereço Residencial</label>
+                <input type="text" id="adm-endereco" class="form-control" placeholder="Rua, número">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-complemento">Complemento</label>
+                <input type="text" id="adm-complemento" class="form-control" placeholder="Apto, bloco">
+              </div>
+            </div>
+
+            <div class="form-row cols-3">
+              <div class="form-group">
+                <label class="form-label" for="adm-bairro">Bairro</label>
+                <input type="text" id="adm-bairro" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-cep">CEP</label>
+                <input type="text" id="adm-cep" class="form-control" placeholder="00000-000">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-cidade">Cidade / UF</label>
+                <input type="text" id="adm-cidade" class="form-control" placeholder="Rio de Janeiro - RJ">
+              </div>
+            </div>
+
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label" for="adm-telefone">Telefone Fixo</label>
+                <input type="text" id="adm-telefone" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="adm-celular">Celular / WhatsApp</label>
+                <input type="text" id="adm-celular" class="form-control">
+              </div>
+            </div>
+          </div>
+
+          <!-- Alerta de Observações Obrigatórias -->
+          <div style="background: var(--bg-muted); border: 1px solid var(--border-color); padding: 12px 16px; border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px;">
+            <strong>⚠️ OBSERVAÇÕES:</strong> Anexar cópia da certidão de nascimento e da carteira de vacinação dos filhos menores de 14 anos e certificado de matrícula escolar para maiores de 6 anos.
+          </div>
+
+          <div class="admission-actions-bar no-print">
+            <button type="button" class="btn btn-secondary" id="btn-adm-reset">Limpar Ficha</button>
+            <button type="submit" class="btn btn-success btn-lg">💾 Salvar & Cadastrar Funcionário</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 5: FOLHA DE PONTO (folhaPonto) & PRÉVIA OFICIAL
+         ==================================================================== -->
+    <section class="view-section" id="view-folha">
+      <div class="resumo-toolbar no-print">
+        <div>
+          <h2 style="font-size: 1.3rem; font-weight: 700; color: var(--color-primary);">Emissão da Folha de Ponto</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Geração de espelho de ponto oficial para conferência e assinatura mensal</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-secondary" id="btn-open-folha-batch-dialog">📑 Imprimir por Intervalo (Lote)</button>
+          <button class="btn btn-primary" id="btn-folha-print-single">🖨️ Imprimir Colaborador Atual</button>
+        </div>
+      </div>
+
+      <!-- Pré-visualização da Folha de Ponto Individual -->
+      <div class="folha-preview-wrapper" id="folha-preview-single">
+        <!-- Renderizada dinamicamente com dados do funcionário selecionado -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       CONTAINER DE IMPRESSÃO EM LOTE (OCULTO EM TELA, VISÍVEL NO PRINT)
+       ==================================================================== -->
+  <div id="print-batch-container"></div>
+
+  <!-- ====================================================================
+       MODAIS E DIÁLOGOS
+       ==================================================================== -->
+
+  <!-- Modal 1: Diálogo folhaPonto (Seleção por Intervalo ex: 5-10) -->
+  <div class="modal-backdrop" id="modal-folhaponto-dialog">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">SELEÇÃO DE PÁGINAS</h3>
+        <button class="btn btn-sm btn-secondary btn-close-modal">✖</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 12px;">Selecione as páginas a serem impressas.<br>Separe o intervalo com um traço ( <strong>-</strong> ).</p>
+        <div style="background: var(--bg-muted); padding: 10px; border-radius: var(--radius-sm); font-size: 0.825rem; margin-bottom: 14px;">
+          <strong>Exemplo:</strong> Para imprimir o intervalo de páginas 5 a 10, digite: <code>5-10</code>.<br>
+          Para imprimir uma única página, digite apenas o número (ex: <code>3</code>).<br>
+          Para imprimir todas as 22 folhas, digite: <code>1-22</code>.
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="inp-batch-interval">Intervalo de Páginas:</label>
+          <input type="text" id="inp-batch-interval" class="form-control" placeholder="1-22" value="1-22" autofocus>
+          <small id="batch-interval-error" style="color: var(--color-danger); display:none; margin-top:4px;"></small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-close-modal">Cancelar</button>
+        <button class="btn btn-primary" id="btn-confirm-batch-print">Imprimir Folhas</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Confirmação de Limpeza de Horas (Macro limparHoras) -->
+  <div class="modal-backdrop" id="modal-confirm-clear-hours">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Limpar Horas do Período</h3>
+        <button class="btn btn-sm btn-secondary btn-close-modal">✖</button>
+      </div>
+      <div class="modal-body">
+        <p>Tem certeza de que deseja limpar todos os registros de horários (Entrada, Intervalos e Saída) de <strong><span id="clear-hours-emp-name">-</span></strong> e restaurar todos os eventos para <code>normal</code>?</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-close-modal">Cancelar</button>
+        <button class="btn btn-danger" id="btn-confirm-clear-hours-action">Confirmar e Limpar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Cadastro / Edição Rápida de Funcionário -->
+  <div class="modal-backdrop" id="modal-employee-edit">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-emp-title">Cadastrar Colaborador</h3>
+        <button class="btn btn-sm btn-secondary btn-close-modal">✖</button>
+      </div>
+      <form id="form-edit-emp">
+        <input type="hidden" id="edit-emp-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="edit-emp-nome">Nome Completo *</label>
+            <input type="text" id="edit-emp-nome" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-emp-funcao">Função *</label>
+            <select id="edit-emp-funcao" class="form-control" required></select>
+          </div>
+          <div class="form-row cols-2">
+            <div class="form-group">
+              <label class="form-label" for="edit-emp-ctps">CTPS</label>
+              <input type="text" id="edit-emp-ctps" class="form-control" placeholder="00000000/00000">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="edit-emp-matricula">Matrícula</label>
+              <input type="text" id="edit-emp-matricula" class="form-control">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="edit-emp-escala">Escala de Trabalho</label>
+            <select id="edit-emp-escala" class="form-control">
+              <option value="6x1">6x1 (07:20 diárias)</option>
+              <option value="12x36">12x36 (12:00 diárias)</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-close-modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar Colaborador</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Container de Toasts -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- SCRIPTS DA APLICAÇÃO -->
+  <script src="js/data.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/pdf-print.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
